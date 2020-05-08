@@ -11,7 +11,7 @@ use progress::Progress;
 
 #[tokio::main]
 async fn main() {
-    let pg = Progress::new("test", io::sink());
+    let pg = Progress::new(io::sink());
     let pg_clone = pg.clone();
 
     let download_handle = tokio::task::spawn(async move {
@@ -23,7 +23,7 @@ async fn main() {
     tokio::task::spawn(async move {
         loop {
             tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
-            println!("{:?}", pg.to_item("id").await);
+            println!("{:?}", pg.to_size().await);
         }
     });
 
