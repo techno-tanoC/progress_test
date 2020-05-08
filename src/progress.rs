@@ -11,20 +11,14 @@ use tokio::sync::Mutex;
 use crate::item::Item;
 
 struct ProgressInner<T> {
-    name: String,
-    total: u64,
     size: u64,
-    canceled: bool,
     buf: T,
 }
 
 impl<T> fmt::Debug for ProgressInner<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ProgressInner")
-            .field("name", &self.name)
-            .field("total", &self.total)
             .field("size", &self.size)
-            .field("canceled", &self.canceled)
             .finish()
     }
 }
@@ -40,34 +34,17 @@ impl<T> std::clone::Clone for Progress<T> {
 }
 
 impl<T> Progress<T> {
-    pub fn new(name: impl ToString, buf: T) -> Self {
+    pub fn new(buf: T) -> Self {
         let inner = Arc::new(Mutex::new(ProgressInner {
-            name: name.to_string(),
-            total: 0,
             size: 0,
-            canceled: false,
             buf,
         }));
         Progress { inner }
     }
 
-    pub async fn set_total(&mut self, total: u64) {
-        self.inner.lock().await.total = total;
-    }
-
-    pub async fn cancel(&mut self) {
-        self.inner.lock().await.canceled = true
-    }
-
-    pub async fn to_item(&self, id: impl ToString) -> Item {
+    pub async fn to_size(&self) -> u64 {
         let pg = self.inner.lock().await;
-        Item {
-            id: id.to_string(),
-            name: pg.name.clone(),
-            total: pg.total,
-            size: pg.size,
-            canceled: pg.canceled,
-        }
+        pg.size
     }
 }
 
@@ -96,16 +73,11 @@ impl<T: AsyncWrite + Unpin + Send> AsyncWrite for Progress<T> {
     ) -> Poll<Result<usize>> {
         match self.inner.lock().boxed().as_mut().poll(cx) {
             Poll::Ready(mut s) => {
-                if s.canceled {
-                    Poll::Ready(Err(io::Error::new(ErrorKind::Interrupted, "canceled")))
-                } else {
-                    let poll = Pin::new(&mut s.buf).poll_write(cx, buf);
-                    if let Poll::Ready(Ok(n)) = poll {
-                        s.size += n as u64;
-                    }
-                    println!("{}", s.size);
-                    poll
+                let poll = Pin::new(&mut s.buf).poll_write(cx, buf);
+                if let Poll::Ready(Ok(n)) = poll {
+                    s.size += n as u64;
                 }
+                poll
             },
             Poll::Pending => {
                 Poll::Pending
