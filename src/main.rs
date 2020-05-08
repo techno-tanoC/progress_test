@@ -1,12 +1,7 @@
-mod item;
 mod progress;
 
-use futures::stream::TryStreamExt;
 use tokio::io::{self, BufReader, BufWriter};
-use tokio::prelude::*;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
 
-use item::Item;
 use progress::Progress;
 
 #[tokio::main]
