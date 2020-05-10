@@ -42,6 +42,7 @@ impl<T> Progress<T> {
 
     pub async fn to_size(&self) -> u64 {
         let pg = self.inner.lock().await;
+        tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
         pg.size
     }
 }
@@ -69,8 +70,10 @@ impl<T: AsyncWrite + Unpin + Send> AsyncWrite for Progress<T> {
         cx: &mut Context,
         buf: &[u8]
     ) -> Poll<Result<usize>> {
+        println!("start poll_write");
         match self.inner.lock().boxed().as_mut().poll(cx) {
             Poll::Ready(mut s) => {
+                println!("mutex ready");
                 let poll = Pin::new(&mut s.buf).poll_write(cx, buf);
                 if let Poll::Ready(Ok(n)) = poll {
                     s.size += n as u64;
@@ -78,6 +81,7 @@ impl<T: AsyncWrite + Unpin + Send> AsyncWrite for Progress<T> {
                 poll
             },
             Poll::Pending => {
+                println!("mutex pending");
                 Poll::Pending
             }
         }
